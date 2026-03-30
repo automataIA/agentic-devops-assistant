@@ -1,0 +1,21 @@
+<div class="space-y-3 p-1">
+  <div class="flex items-center gap-2 flex-wrap">
+    <span class="font-mono font-bold text-sm truncate max-w-xs" title="{{ title }}">{{ title }}</span>
+    <span class="badge badge-outline badge-xs font-mono shrink-0">chunk {{ chunk_index }}</span>
+  </div>
+  <div id="chunk-preview-content"
+       class="rounded-lg border border-success/30 bg-success/10 p-4 text-sm leading-relaxed prose prose-sm max-w-none"
+       data-raw="{{ chunk_text | e }}">
+  </div>
+</div>
+<script>
+  (function () {
+    var el = document.getElementById('chunk-preview-content');
+    if (el && window.marked) {
+      var t = document.createElement('textarea');
+      t.innerHTML = el.dataset.raw;
+      el.innerHTML = window.marked.parse(t.value);
+      if (window.hljs) { el.querySelectorAll('pre code').forEach(function(b) { hljs.highlightElement(b); }); }
+    }
+  })();
+</script>

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+
+# Secrets & local config
+.env
+.env.*
+!.env.example
+
+# Volatile data (mounted as Docker volume at runtime)
+data/
+
+# Dev/test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Project metadata
+.git/
+.github/
+.claude/
+docs/
+info/
+tests/
+
+# Node.js
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.egg-info/

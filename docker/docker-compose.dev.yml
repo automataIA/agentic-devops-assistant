@@ -1,0 +1,92 @@
+# Standalone development compose — hot-reload for Python and CSS
+#
+# Usage (from project root):
+#   docker compose -f docker/docker-compose.dev.yml up -d --build
+#
+# Features vs production:
+#   - Mounts local src/ for live Python reload (uvicorn --reload)
+#   - Tailwind CSS watcher sidecar for live CSS rebuilds
+#   - APP_ENV=development
+
+services:
+    minio:
+        image: quay.io/minio/minio:latest
+        container_name: devops-minio
+        env_file:
+            - .env
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+            MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+        ports:
+            - "${MINIO_PORT:-9000}:9000"
+            - "${MINIO_CONSOLE_PORT:-9001}:9001"
+        volumes:
+            - minio_data:/data
+        networks:
+            - devops-net
+        healthcheck:
+            test: ["CMD", "mc", "ready", "local"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    app:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+            target: runtime
+        container_name: devops-app
+        env_file:
+            - .env
+        depends_on:
+            minio:
+                condition: service_healthy
+        ports:
+            - "${PORT:-8000}:8000"
+        volumes:
+            - app_data:/app/data
+            # Mount Python source dirs for hot-reload.
+            # src/static/ is intentionally excluded: compiled CSS comes from the
+            # Dockerfile css-builder stage (Stage 0) baked into the image.
+            - ../src/agents:/app/src/agents:ro
+            - ../src/deps:/app/src/deps:ro
+            - ../src/models:/app/src/models:ro
+            - ../src/tools:/app/src/tools:ro
+            - ../src/templates:/app/src/templates:ro
+            - ../src/app.py:/app/src/app.py:ro
+            - ../src/main.py:/app/src/main.py:ro
+        networks:
+            - devops-net
+        environment:
+            APP_ENV: development
+            LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+            PORT: ${PORT:-8000}
+            MINIO_ENDPOINT: http://minio:9000
+            MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+            MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+            ICEBERG_WAREHOUSE: ${ICEBERG_WAREHOUSE:-s3://warehouse/iceberg}
+            ICEBERG_CATALOG_URI: ${ICEBERG_CATALOG_URI:-sqlite:///./data/iceberg_catalog.db}
+            DUCKDB_DATA_PATH: ${DUCKDB_DATA_PATH:-./data/local.duckdb}
+            DEMO_LOGS_PATH: ${DEMO_LOGS_PATH:-./data/logs_seed.parquet}
+            AGENT_BACKEND: ${AGENT_BACKEND:-ollama}
+            AGENT_MODEL: ${AGENT_MODEL:-qwen3:8b-q4_k_m}
+            OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+            ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+            OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+            MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+            EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+            EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+            LOGFIRE_TOKEN: ${LOGFIRE_TOKEN:-}
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        restart: unless-stopped
+
+
+networks:
+    devops-net:
+        driver: bridge
+
+volumes:
+    minio_data:
+    app_data:

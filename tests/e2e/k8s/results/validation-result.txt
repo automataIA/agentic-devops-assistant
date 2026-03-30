@@ -1,0 +1,58 @@
+  10 error(s) remaining after static repair
+  kind: 'Deploymentt' is not one of ['Deployment']metadata: 'name' is a required propertyspec > replicas: 'three' is not of type 'integer'spec > strategy > type: 'BlueGreen' is not one of ['RollingUpdate', 'Recreate']spec > template > spec > containers > 0 > image: '' should be non-emptyspec > template > spec > containers > 0 > imagePullPolicy: 'always' is not one of ['Always', 'IfNotPresent', 'Never']spec > template > spec > containers > 0 > name: 'My_API_Container' does not match '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'spec > template > spec > containers > 0 > ports > 0 > containerPort: 99999 is greater than the maximum of 65535spec > template > spec > containers > 0 > ports > 0 > protocol: 'HTTP' is not one of ['TCP', 'UDP', 'SCTP']spec > template > spec > containers > 1: 'image' is a required property
+  ⚠ Ambiguous fields (require manual review): metadata, spec > template > spec > containers > 0 > name, spec > template > spec > containers > 0 > image, spec > template > spec > containers > 0 > ports > 0 > containerPort, spec > template > spec > containers > 1, spec > replicas
+  Repaired YAML
+  # K8s Deployment YAML — intentionally broken for validation test
+apiVersion: apps/v1
+kind: Deploymentt  # typo in kind
+metadata:
+  namespace: Production  # wrong: namespaces are lowercase
+  labels:
+    app: my-api
+    version: 1.2.3
+    env: production
+spec:
+  replicas: three  # wrong type: must be integer, not string
+  selector:
+    matchLabels:
+      app: my-api
+      # missing 'version' label that's in template labels (selector/template label mismatch)
+  strategy:
+    type: BlueGreen  # invalid: must be RollingUpdate or Recreate
+  template:
+    metadata:
+      labels:
+        app: my-api
+        version: 1.2.3
+    spec:
+      restartPolicy: OnFailure  # invalid for Deployment: must be Always
+      containers:
+      - name: My_API_Container    # invalid: uppercase + underscore not allowed
+        image: ''                 # empty image is invalid
+        imagePullPolicy: always    # wrong case: must be Always/IfNotPresent/Never
+        ports:
+        - containerPort: 99999      # invalid: max is 65535
+          protocol: HTTP      # invalid: must be TCP/UDP/SCTP
+        env:
+        - name: DATABASE_URL
+          value: postgres://user:pass@db:5432/mydb
+        - name: LOG_LEVEL
+              # missing value and no valueFrom — empty env var
+        resources:
+          requests:
+            cpu: 500m
+            memory: 128Mi
+          limits:
+            cpu: '0'              # invalid: 0 CPU limit
+            memory: 64Mi    # limit < request — not caught by schema but semantically wrong
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: -5    # invalid: cannot be negative
+        # Second container missing required 'image' field
+      - name: sidecar-proxy
+        imagePullPolicy: IfNotPresent
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+  paused: false

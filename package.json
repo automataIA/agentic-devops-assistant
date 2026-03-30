@@ -1,0 +1,22 @@
+{
+  "name": "agentic-devops-assistant",
+  "version": "1.0.0",
+  "description": "An agentic assistant for SRE and DevOps teams that routes questions to specialist AI agents: structured log analysis, semantic search on internal docs, and strict YAML validation for Kubernetes and GitLab CI.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "css:build": "npx @tailwindcss/cli -i src/static/css/input.css -o src/static/css/output.css --minify",
+    "css:watch": "npx @tailwindcss/cli -i src/static/css/input.css -o src/static/css/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "daisyui": "^5.5.19",
+    "tailwindcss": "^4.2.2"
+  }
+}

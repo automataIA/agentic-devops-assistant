@@ -1,0 +1,215 @@
+name: "Simulated Conversation with SRE Copilot"
+session: "sre-copilot-conversation-06"
+browser: chrome
+headed: false
+timeout: 300
+auto_close: true
+
+# Simulates a realistic SRE conversation covering all 3 specialist agents:
+#   1. Greeting / discovery
+#   2. Log Explorer  → "show errors for api-gateway"
+#   3. Docu-RAG      → "how do I rollback?"
+#   4. Config Validator → paste a Kubernetes YAML with an intentional error
+#
+# Requires:
+#   - Server running at http://localhost:8000/
+#   - Ollama reachable with qwen3:8b-q4_k_m (or ANTHROPIC_API_KEY set)
+#   - Each wait is conservative — reduce if your hardware is faster
+
+steps:
+  # ── Setup ──────────────────────────────────────────────────────────────────
+
+  - name: "Open homepage"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  - name: "Screenshot: initial state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-00-initial.png"]
+
+  # ── Turn 1: Greeting ───────────────────────────────────────────────────────
+
+  - name: "[Turn 1] Type greeting message"
+    action: fill
+    args: ["#message-input", "Ciao! Cosa puoi fare per me?"]
+
+  - name: "[Turn 1] Screenshot: message typed"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-01-typed.png"]
+
+  - name: "[Turn 1] Submit message"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.3
+
+  - name: "[Turn 1] Screenshot: user bubble appeared"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-01-user-bubble.png"]
+
+  - name: "[Turn 1] Wait for agent response"
+    action: eval
+    args: ["null"]
+    wait: 45
+
+  - name: "[Turn 1] Screenshot: greeting response"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-01-response.png"]
+
+  - name: "[Turn 1] Snapshot: DOM after greeting"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-01-greeting.yaml"]
+
+  # ── Turn 2: Log Explorer ───────────────────────────────────────────────────
+
+  - name: "[Turn 2] Type log query"
+    action: fill
+    args: ["#message-input", "Mostrami gli errori recenti per il servizio api-gateway"]
+
+  - name: "[Turn 2] Submit log query"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.3
+
+  - name: "[Turn 2] Screenshot: user bubble for log query"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-02-user-bubble.png"]
+
+  - name: "[Turn 2] Wait for Log Explorer response"
+    action: eval
+    args: ["null"]
+    wait: 60
+
+  - name: "[Turn 2] Screenshot: log explorer response"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-02-log-response.png"]
+
+  - name: "[Turn 2] Check Log Explorer badge appeared"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Log Explorer')"]
+
+  - name: "[Turn 2] Snapshot: DOM after log query"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-02-log-explorer.yaml"]
+
+  # ── Turn 3: Docu-RAG ──────────────────────────────────────────────────────
+
+  - name: "[Turn 3] Type documentation query"
+    action: fill
+    args: ["#message-input", "Come faccio un rollback del database? C'è un runbook?"]
+
+  - name: "[Turn 3] Submit documentation query"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.3
+
+  - name: "[Turn 3] Screenshot: user bubble for doc query"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-03-user-bubble.png"]
+
+  - name: "[Turn 3] Wait for Docu-RAG response"
+    action: eval
+    args: ["null"]
+    wait: 60
+
+  - name: "[Turn 3] Screenshot: docu-rag response"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-03-doc-response.png"]
+
+  - name: "[Turn 3] Check Docu-RAG badge appeared"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Docu-RAG')"]
+
+  - name: "[Turn 3] Snapshot: DOM after doc query"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-03-docu-rag.yaml"]
+
+  # ── Turn 4: Config Validator (K8s YAML con errore) ─────────────────────────
+
+  - name: "[Turn 4] Type config validation request with broken YAML"
+    action: fill
+    args: ["#message-input", "Valida questo manifest Kubernetes — ho un errore che non capisco:\napiVersion: v1\nkind: Deployment\nmetadata:\n  name: api-gateway\nspec:\n  replicas: abc\n  selector:\n    matchLabels:\n      app: api-gateway\n  template:\n    metadata:\n      labels:\n        app: api-gateway\n    spec:\n      containers:\n        - name: api\n          image: myrepo/api:latest"]
+
+  - name: "[Turn 4] Submit YAML validation"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.3
+
+  - name: "[Turn 4] Screenshot: user bubble for YAML"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-04-user-bubble.png"]
+
+  - name: "[Turn 4] Wait for Config Validator response"
+    action: eval
+    args: ["null"]
+    wait: 60
+
+  - name: "[Turn 4] Screenshot: config validator response"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-04-config-response.png"]
+
+  - name: "[Turn 4] Check Config Validator badge appeared"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Config Validator')"]
+
+  - name: "[Turn 4] Snapshot: DOM after validation"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-04-config-validator.yaml"]
+
+  # ── Turn 5: K8s YAML corretto ──────────────────────────────────────────────
+
+  - name: "[Turn 5] Submit corrected K8s YAML"
+    action: fill
+    args: ["#message-input", "Ho corretto il manifest:\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api-gateway\n  namespace: production\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: api-gateway\n  template:\n    metadata:\n      labels:\n        app: api-gateway\n    spec:\n      containers:\n        - name: api\n          image: myrepo/api:v1.2.0\n          resources:\n            limits:\n              memory: \"256Mi\"\n              cpu: \"500m\""]
+
+  - name: "[Turn 5] Submit corrected YAML"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.3
+
+  - name: "[Turn 5] Wait for validation response"
+    action: eval
+    args: ["null"]
+    wait: 60
+
+  - name: "[Turn 5] Screenshot: valid YAML response"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-05-valid-yaml-response.png"]
+
+  - name: "[Turn 5] Snapshot: DOM after valid YAML"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-05-valid-yaml.yaml"]
+
+  # ── Final state ────────────────────────────────────────────────────────────
+
+  - name: "Scroll to top of conversation"
+    action: eval
+    args: ["document.getElementById('chat-container').scrollTop = 0; true"]
+
+  - name: "Screenshot: full conversation from top"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-final-top.png"]
+
+  - name: "Scroll to bottom of conversation"
+    action: eval
+    args: ["const c = document.getElementById('chat-container'); c.scrollTop = c.scrollHeight; true"]
+
+  - name: "Screenshot: full conversation bottom"
+    action: screenshot
+    args: ["tests/e2e/screenshots/06-final-bottom.png"]
+
+  - name: "Count total chat bubbles in conversation"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-bubble').length"]
+
+  - name: "Count all agent badges rendered"
+    action: eval
+    args: ["document.querySelectorAll('.chat-header .badge').length"]
+
+  - name: "Verify no error bubbles in conversation"
+    action: eval
+    args: ["document.querySelectorAll('.chat-bubble-error').length === 0"]
+
+  - name: "Final snapshot: complete conversation DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/06-final-conversation.yaml"]

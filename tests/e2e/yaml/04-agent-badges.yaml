@@ -1,0 +1,121 @@
+name: "Agent Routing Badges"
+session: "sre-copilot-badges-04"
+browser: chrome
+headed: false
+timeout: 120
+auto_close: true
+
+# Tests that the Supervisore correctly routes each query to the right specialist
+# agent and that the agent label badge renders in the _message.html template:
+#
+#   <div class="chat-header opacity-60 text-xs mb-0.5">
+#     <span class="badge badge-outline badge-xs font-mono">{{ agent }}</span>
+#   </div>
+#
+# Expected badge labels:
+#   - "Log Explorer"      → log queries
+#   - "Docu-RAG"          → documentation queries
+#   - "Config Validator"  → YAML validation queries
+#
+# Requires: server running with a working ANTHROPIC_API_KEY (or Ollama).
+
+steps:
+  - name: "Open homepage"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  - name: "Screenshot: initial state before badge tests"
+    action: screenshot
+    args: ["tests/e2e/screenshots/04-initial.png"]
+
+  # ── Log Explorer ────────────────────────────────────────────────────────────
+
+  - name: "[Log Explorer] Fill query to trigger log delegation"
+    action: fill
+    args: ["#message-input", "show me errors for api-gateway in the last hour"]
+
+  - name: "[Log Explorer] Submit message"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+
+  - name: "[Log Explorer] Wait for agent response"
+    action: eval
+    args: ["null"]
+    wait: 25
+
+  - name: "[Log Explorer] Screenshot: response with badge"
+    action: screenshot
+    args: ["tests/e2e/screenshots/04-log-explorer-response.png"]
+
+  - name: "[Log Explorer] Verify 'Log Explorer' badge appears in chat-header"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Log Explorer')"]
+
+  - name: "[Log Explorer] Snapshot: log explorer response DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/04-log-explorer.yaml"]
+
+  # ── Docu-RAG ────────────────────────────────────────────────────────────────
+
+  - name: "[Docu-RAG] Fill query to trigger documentation delegation"
+    action: fill
+    args: ["#message-input", "how do I rollback the database according to the runbook?"]
+
+  - name: "[Docu-RAG] Submit message"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+
+  - name: "[Docu-RAG] Wait for agent response"
+    action: eval
+    args: ["null"]
+    wait: 25
+
+  - name: "[Docu-RAG] Screenshot: response with badge"
+    action: screenshot
+    args: ["tests/e2e/screenshots/04-docu-rag-response.png"]
+
+  - name: "[Docu-RAG] Verify 'Docu-RAG' badge appears in chat-header"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Docu-RAG')"]
+
+  - name: "[Docu-RAG] Snapshot: docu-rag response DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/04-docu-rag.yaml"]
+
+  # ── Config Validator ────────────────────────────────────────────────────────
+
+  - name: "[Config Validator] Fill YAML snippet to trigger validation delegation"
+    action: fill
+    args: ["#message-input", "validate this Kubernetes manifest:\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api-gateway\n  namespace: production"]
+
+  - name: "[Config Validator] Submit message"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+
+  - name: "[Config Validator] Wait for agent response"
+    action: eval
+    args: ["null"]
+    wait: 25
+
+  - name: "[Config Validator] Screenshot: response with badge"
+    action: screenshot
+    args: ["tests/e2e/screenshots/04-config-validator-response.png"]
+
+  - name: "[Config Validator] Verify 'Config Validator' badge appears in chat-header"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.chat-header .badge')).some(b => b.textContent.trim() === 'Config Validator')"]
+
+  - name: "[Config Validator] Snapshot: config validator response DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/04-config-validator.yaml"]
+
+  # ── Source citations ─────────────────────────────────────────────────────────
+
+  - name: "Check source citation badges rendered (badge-info in chat-footer)"
+    action: eval
+    args: ["document.querySelectorAll('.chat-footer .badge-info').length"]
+
+  - name: "Screenshot: full badge coverage — all 3 agents visible"
+    action: screenshot
+    args: ["tests/e2e/screenshots/04-all-badges.png"]

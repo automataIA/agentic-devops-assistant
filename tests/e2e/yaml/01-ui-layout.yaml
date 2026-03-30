@@ -1,0 +1,103 @@
+name: "UI Layout Verification"
+session: "sre-copilot-layout-01"
+browser: chrome
+headed: false
+timeout: 30
+auto_close: true
+
+# Tests the static page structure — no LLM or agent calls required.
+# Requires only: uv run uvicorn src.app:app (server running at http://localhost:8000/)
+
+steps:
+  - name: "Open homepage"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  - name: "Screenshot: initial load"
+    action: screenshot
+    args: ["tests/e2e/screenshots/01-layout-initial.png"]
+
+  - name: "Snapshot: initial DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/01-layout-initial.yaml"]
+
+  - name: "Verify page title"
+    action: eval
+    args: ["document.title === 'SRE / DevOps Copilot'"]
+
+  - name: "Verify header navbar exists"
+    action: eval
+    args: ["document.querySelector('header.navbar') !== null"]
+
+  - name: "Verify header title text"
+    action: eval
+    args: ["document.querySelector('header span.font-mono') !== null && document.querySelector('header span.font-mono').textContent.trim() === 'SRE / DevOps Copilot'"]
+
+  - name: "Verify 4-Agent badge present"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.badge')).some(b => b.textContent.trim() === '4-Agent')"]
+
+  - name: "Verify PydanticAI badge present"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('.badge')).some(b => b.textContent.trim() === 'PydanticAI')"]
+
+  - name: "Verify main chat container exists"
+    action: eval
+    args: ["document.getElementById('chat-container') !== null"]
+
+  - name: "Verify welcome message paragraph"
+    action: eval
+    args: ["document.querySelector('#chat-container .chat-bubble p') !== null && document.querySelector('#chat-container .chat-bubble p').textContent.includes(\"I'm your SRE/DevOps assistant\")"]
+
+  - name: "Verify log capability badge (text-info)"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('#chat-container .text-info')).some(el => el.textContent.trim() === 'log')"]
+
+  - name: "Verify doc capability badge (text-success)"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('#chat-container .text-success')).some(el => el.textContent.trim() === 'doc')"]
+
+  - name: "Verify cfg capability badge (text-warning)"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('#chat-container .text-warning')).some(el => el.textContent.trim() === 'cfg')"]
+
+  - name: "Verify textarea #message-input exists"
+    action: eval
+    args: ["document.getElementById('message-input') !== null"]
+
+  - name: "Verify textarea placeholder text"
+    action: eval
+    args: ["document.getElementById('message-input').placeholder.includes('Ask about logs')"]
+
+  - name: "Verify Send button text"
+    action: eval
+    args: ["document.querySelector('#chat-form button[type=submit]') !== null && document.querySelector('#chat-form button[type=submit]').textContent.trim() === 'Send'"]
+
+  - name: "Verify typing indicator hidden initially"
+    action: eval
+    args: ["getComputedStyle(document.getElementById('typing-indicator')).display === 'none'"]
+
+  - name: "Verify DaisyUI dim theme applied"
+    action: eval
+    args: ["document.documentElement.getAttribute('data-theme') === 'dim'"]
+
+  - name: "Verify HTMX form action attribute"
+    action: eval
+    args: ["document.getElementById('chat-form').getAttribute('hx-post') === '/chat/html'"]
+
+  - name: "Verify HTMX swap target"
+    action: eval
+    args: ["document.getElementById('chat-form').getAttribute('hx-target') === '#chat-container'"]
+
+  - name: "Verify HTMX swap strategy beforeend"
+    action: eval
+    args: ["document.getElementById('chat-form').getAttribute('hx-swap') === 'beforeend'"]
+
+  - name: "Verify HTMX typing indicator attribute"
+    action: eval
+    args: ["document.getElementById('chat-form').getAttribute('hx-indicator') === '#typing-indicator'"]
+
+  - name: "Screenshot: all layout checks complete"
+    action: screenshot
+    args: ["tests/e2e/screenshots/01-layout-verified.png"]

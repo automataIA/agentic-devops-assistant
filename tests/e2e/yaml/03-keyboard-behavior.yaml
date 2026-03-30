@@ -1,0 +1,105 @@
+name: "Keyboard Behavior"
+session: "sre-copilot-keyboard-03"
+browser: chrome
+headed: false
+timeout: 60
+auto_close: true
+
+# Tests two keyboard conventions and textarea auto-grow:
+#   1. Shift+Enter inserts a newline WITHOUT submitting the form
+#   2. Enter alone submits the form (user bubble appears)
+#   3. Textarea height grows with content, capped at max-h-44 (176px)
+#
+# Does NOT require a working LLM — form submission is tested via the user
+# bubble appearing client-side, not the agent response.
+
+steps:
+  - name: "Open homepage"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  - name: "Screenshot: initial state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/03-initial.png"]
+
+  - name: "Record initial textarea height"
+    action: eval
+    args: ["window._initH = document.getElementById('message-input').getBoundingClientRect().height; window._initH"]
+
+  - name: "Click textarea to focus"
+    action: click
+    args: ["#message-input"]
+
+  - name: "Type first line"
+    action: type
+    args: ["First line of message"]
+
+  - name: "Press Shift+Enter — should insert newline, NOT submit"
+    action: press
+    args: ["Shift+Enter"]
+
+  - name: "Verify textarea still focused (form was not submitted)"
+    action: eval
+    args: ["document.activeElement === document.getElementById('message-input')"]
+
+  - name: "Verify textarea value contains newline character"
+    action: eval
+    args: ["document.getElementById('message-input').value.includes('\\n')"]
+
+  - name: "Type second line after Shift+Enter"
+    action: type
+    args: ["Second line of message"]
+
+  - name: "Trigger input event to measure auto-grow"
+    action: eval
+    args: ["document.getElementById('message-input').dispatchEvent(new Event('input')); true"]
+
+  - name: "Verify textarea height grew (auto-grow fired)"
+    action: eval
+    args: ["document.getElementById('message-input').getBoundingClientRect().height > window._initH"]
+
+  - name: "Screenshot: multiline content in textarea"
+    action: screenshot
+    args: ["tests/e2e/screenshots/03-multiline.png"]
+
+  - name: "Verify full multiline value"
+    action: eval
+    args: ["document.getElementById('message-input').value === 'First line of message\\nSecond line of message'"]
+
+  - name: "Record chat bubble count before Enter submit"
+    action: eval
+    args: ["window._bubblesBefore = document.querySelectorAll('#chat-container .chat-bubble').length; window._bubblesBefore"]
+
+  - name: "Press Enter — should submit the form"
+    action: press
+    args: ["Enter"]
+
+  - name: "Wait briefly for client-side user bubble to appear"
+    action: eval
+    args: ["null"]
+    wait: 0.5
+
+  - name: "Screenshot: after Enter submit"
+    action: screenshot
+    args: ["tests/e2e/screenshots/03-enter-submit.png"]
+
+  - name: "Verify new user bubble appeared after Enter submit"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-bubble').length > window._bubblesBefore"]
+
+  - name: "Verify textarea cleared after Enter submit"
+    action: eval
+    args: ["document.getElementById('message-input').value === ''"]
+
+  - name: "Test max-height cap: fill with 20 lines and verify cap at 176px"
+    action: eval
+    args: ["(function(){ const ta = document.getElementById('message-input'); ta.value = Array(20).fill('line content here').join('\\n'); ta.dispatchEvent(new Event('input')); return ta.getBoundingClientRect().height <= 176; })()"]
+
+  - name: "Screenshot: textarea height capped at max-h-44"
+    action: screenshot
+    args: ["tests/e2e/screenshots/03-height-cap.png"]
+
+  - name: "Snapshot: keyboard behavior final state"
+    action: snapshot
+    args: ["tests/e2e/snapshots/03-keyboard.yaml"]

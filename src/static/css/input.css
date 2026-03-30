@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@source "../../../src/templates";
+@plugin "daisyui" {
+  themes: business --default, bumblebee --prefersdark false;
+}
+
+@layer base {
+  html {
+    /*
+     * Fluid font-size: 16px on 1080p (≤1920px) → 20px on 4K (≥3840px).
+     * clamp(min, preferred, max) — all values in rem so user zoom still works.
+     * Formula: 16px at 1920px viewport, 20px at 3840px viewport.
+     */
+    font-size: clamp(1rem, 0.5rem + 0.4vw, 1.25rem);
+  }
+}

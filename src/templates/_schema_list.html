@@ -1,0 +1,33 @@
+{% if schemas %}
+<select name="schema_id" id="schema-select" class="select select-bordered select-sm w-full font-mono text-xs">
+  <option value="" disabled {% if not active_schema_id %}selected{% endif %}>Select schema…</option>
+  {% for s in schemas %}
+  <option value="{{ s.schema_id }}" {% if active_schema_id == s.schema_id %}selected{% endif %}>
+    {{ s.title }} ({{ s.format }})
+  </option>
+  {% endfor %}
+</select>
+<div class="flex items-center justify-between mt-1.5 min-h-5">
+  {% if active_schema_id %}
+  <span class="text-xs font-mono text-success flex items-center gap-1">
+    <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Active: {{ active_schema_title }}
+  </span>
+  <button type="button"
+          hx-delete="/schemas/active"
+          hx-target="#schema-selector-wrap"
+          hx-swap="innerHTML"
+          class="btn btn-ghost btn-xs font-mono text-error">Clear</button>
+  {% else %}
+  <span class="text-xs font-mono text-base-content/40">No active reference</span>
+  <button type="button"
+          hx-post="/schemas/activate"
+          hx-include="#schema-select"
+          hx-target="#schema-selector-wrap"
+          hx-swap="innerHTML"
+          class="btn btn-ghost btn-xs font-mono text-success">Set active</button>
+  {% endif %}
+</div>
+{% else %}
+<p class="text-xs font-mono text-base-content/40 py-1">No schemas stored yet — upload one first.</p>
+{% endif %}

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="business">
+<head>
+  <script>
+    // Restore theme before first paint to avoid flash
+    (function() {
+      var t = localStorage.getItem('theme');
+      if (t === 'bumblebee' || t === 'business') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    })();
+  </script>
+  <script>
+    function syncHljsTheme() {
+      var el = document.getElementById('hljs-theme');
+      if (!el) return;
+      var isLight = document.documentElement.getAttribute('data-theme') === 'bumblebee';
+      el.href = isLight
+        ? 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css'
+        : 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css';
+    }
+    syncHljsTheme();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SRE / DevOps Copilot</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  <link href="/static/css/output.css" rel="stylesheet" />
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+
+  <link rel="stylesheet" id="hljs-theme"
+        href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" />
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/bash.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked-highlight@2/lib/index.umd.js"></script>
+
+  <script>
+    const markedHighlight = globalThis.markedHighlight.markedHighlight;
+    marked.use(markedHighlight({
+      langPrefix: 'hljs language-',
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      }
+    }));
+    marked.use({ breaks: true, gfm: true });
+  </script>
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .font-mono, code, pre, .chat-header { font-family: 'JetBrains Mono', monospace; }
+    #chat-container { scroll-behavior: smooth; }
+    #typing-indicator { display: none; }
+    .htmx-request #typing-indicator { display: block; }
+
+    /* Sidebar transition */
+    #sidebar {
+      transition: width 0.2s ease, min-width 0.2s ease;
+      width: 256px;
+      min-width: 256px;
+    }
+    #sidebar.collapsed {
+      width: 0;
+      min-width: 0;
+      border-right-width: 0;
+    }
+
+    /* History item hover actions */
+    .history-item .item-delete { opacity: 0; transition: opacity 0.1s; }
+    .history-item:hover .item-delete { opacity: 1; }
+    .history-item.active { background: oklch(var(--p) / 0.12); }
+
+    /* Markdown prose overrides */
+    .md-content h1, .md-content h2, .md-content h3 { font-weight: 600; margin-top: 0.75em; margin-bottom: 0.25em; }
+    .md-content h1 { font-size: 1.25em; }
+    .md-content h2 { font-size: 1.1em; }
+    .md-content h3 { font-size: 1em; }
+    .md-content p { margin: 0.4em 0; }
+    .md-content ul, .md-content ol { margin: 0.4em 0; padding-left: 1.5em; }
+    .md-content ul { list-style-type: disc; }
+    .md-content ol { list-style-type: decimal; }
+    .md-content li { margin: 0.15em 0; }
+    .md-content code:not(pre code) {
+      background: color-mix(in oklch, currentColor 10%, transparent);
+      padding: 0.15em 0.35em;
+      border-radius: 0.25em;
+      font-size: 0.9em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .md-content pre {
+      position: relative;
+      background: oklch(from oklch(var(--b2)) calc(l - 0.05) c h);
+      border: 1px solid oklch(var(--b3));
+      border-radius: 0.5em;
+      padding: 0.75em 1em;
+      margin: 0.5em 0;
+      overflow-x: auto;
+      font-size: 0.85em;
+    }
+    .md-content pre code { font-family: 'JetBrains Mono', monospace; background: none; padding: 0; }
+    .md-content table { border-collapse: collapse; margin: 0.5em 0; font-size: 0.85em; width: 100%; }
+    .md-content th, .md-content td { border: 1px solid oklch(var(--b3)); padding: 0.35em 0.6em; text-align: left; }
+    .md-content th { background: oklch(var(--b2)); font-weight: 600; }
+    .md-content blockquote { border-left: 3px solid oklch(var(--b3)); padding-left: 0.75em; margin: 0.5em 0; opacity: 0.85; }
+    .md-content a { color: oklch(var(--p)); text-decoration: underline; }
+    .md-content hr { border-color: oklch(var(--b3)); margin: 0.75em 0; }
+
+    /* Blinking cursor */
+    .typing-cursor { animation: blink 0.8s step-end infinite; font-weight: bold; color: oklch(var(--p)); }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* Copy button */
+    .md-content pre .copy-btn { position: absolute; top: 0.35em; right: 0.35em; opacity: 0; transition: opacity 0.15s; }
+    .md-content pre:hover .copy-btn { opacity: 1; }
+
+    /* Toast */
+    #toast { transition: opacity 0.3s; }
+    #toast.hidden { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+
+<body class="h-dvh flex flex-row bg-base-100 text-base-content overflow-hidden">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <aside id="sidebar" class="flex flex-col bg-base-200 border-r border-base-300 overflow-hidden shrink-0">
+
+    <!-- Sidebar header -->
+    <div class="px-3 pt-3 pb-2 border-b border-base-300 shrink-0">
+      <!-- Row 1: logo + title + theme toggle -->
+      <div class="flex items-center gap-2 mb-2">
+        <svg class="w-4 h-4 text-primary shrink-0" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span class="font-mono font-semibold text-primary text-sm tracking-tight whitespace-nowrap flex-1">SRE Copilot</span>
+        <!-- Theme toggle -->
+        <label class="swap swap-rotate btn btn-ghost btn-xs px-1" aria-label="Toggle light/dark theme">
+          <input type="checkbox" value="bumblebee"
+                 id="theme-checkbox"
+                 onchange="(function(cb){
+                   var t = cb.checked ? 'bumblebee' : 'business';
+                   document.documentElement.setAttribute('data-theme', t);
+                   localStorage.setItem('theme', t);
+                   syncHljsTheme();
+                 })(this)" />
+          <svg class="swap-off h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/>
+          </svg>
+          <svg class="swap-on h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M21.64,13a1,1,0,0,0-1.05-.14,8.05,8.05,0,0,1-3.37.73A8.15,8.15,0,0,1,9.08,5.49a8.59,8.59,0,0,1,.25-2A1,1,0,0,0,8,2.36,10.14,10.14,0,1,0,22,14.05,1,1,0,0,0,21.64,13Zm-9.5,6.69A8.14,8.14,0,0,1,7.08,5.22v.27A10.15,10.15,0,0,0,17.22,15.63a9.79,9.79,0,0,0,2.1-.22A8.11,8.11,0,0,1,12.14,19.73Z"/>
+          </svg>
+        </label>
+      </div>
+      <!-- Row 2: agent pills -->
+      <div class="flex flex-wrap gap-1 mb-2">
+        <span class="badge badge-info badge-outline badge-xs font-mono">Logs</span>
+        <span class="badge badge-success badge-outline badge-xs font-mono">Docs</span>
+        <span class="badge badge-warning badge-outline badge-xs font-mono">Config</span>
+      </div>
+    </div>
+
+    <!-- New Chat + Add Docs buttons -->
+    <div class="px-2 pt-3 pb-2 shrink-0">
+      <button id="new-chat-btn"
+              class="btn btn-primary btn-sm w-full font-mono gap-1.5 justify-start">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New Chat
+      </button>
+      <button type="button"
+              onclick="document.getElementById('ingest-modal').showModal()"
+              class="btn btn-outline btn-success btn-sm w-full font-mono gap-1.5 justify-start mt-1">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        + Docs
+      </button>
+      <button type="button"
+              onclick="document.getElementById('schema-modal').showModal(); htmx.trigger('#schema-selector-wrap', 'schema-modal-open')"
+              class="btn btn-outline btn-warning btn-sm w-full font-mono gap-1.5 justify-start mt-1">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <line x1="12" y1="7" x2="16" y2="7"/><line x1="12" y1="11" x2="16" y2="11"/><line x1="12" y1="15" x2="14" y2="15"/>
+        </svg>
+        Schemas
+      </button>
+    </div>
+
+    <!-- Chat history -->
+    <div class="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+      <div id="history-list" class="space-y-0.5"></div>
+    </div>
+
+
+  </aside>
+
+  <!-- ── Main area ────────────────────────────────────────────────────────── -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- ── Topbar ─────────────────────────────────────────────────────────── -->
+    <header class="navbar bg-base-200 border-b border-base-300 px-3 min-h-11 shrink-0 gap-2">
+      <!-- Sidebar toggle -->
+      <button id="sidebar-toggle"
+              class="btn btn-ghost btn-sm px-2 text-base-content/60 hover:text-base-content"
+              aria-label="Toggle sidebar">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <span id="topbar-title" class="font-mono text-sm text-base-content/50 truncate flex-1">New Chat</span>
+    </header>
+
+    <!-- ── Chat area ──────────────────────────────────────────────────────── -->
+    <main id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 min-h-0">
+
+      <!-- Welcome message -->
+      <div class="flex flex-col items-center justify-center h-full min-h-64" id="welcome-screen">
+        <div class="w-full max-w-xl">
+          <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-3">
+              <svg class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <h1 class="text-lg font-semibold">SRE / DevOps Copilot</h1>
+            <p class="text-sm text-base-content/50 mt-1">Ask about logs, docs, or validate a YAML config.</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <!-- Log Explorer card -->
+            <button type="button"
+                    onclick="setPrompt('/logs Show errors for api-gateway in the last hour')"
+                    class="card bg-base-200 hover:bg-info/10 border border-base-300 hover:border-info/40 transition-all cursor-pointer p-3 text-left rounded-xl">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  <span class="font-mono text-xs font-semibold text-info">Log Explorer</span>
+                </div>
+                <span id="status-logs-count" class="text-[10px] font-mono opacity-50 bg-base-300 px-1 rounded">...</span>
+              </div>
+              <p class="text-xs text-base-content/60 leading-snug">Search errors, traces, service health</p>
+              <p class="text-[11px] font-mono text-base-content/35 mt-2 italic border border-base-300 inline-block px-1 rounded">/logs</p>
+            </button>
+            <!-- Docu-RAG card -->
+            <button type="button"
+                    onclick="setPrompt('/docs How does the deployment pipeline work?')"
+                    class="card bg-base-200 hover:bg-success/10 border border-base-300 hover:border-success/40 transition-all cursor-pointer p-3 text-left rounded-xl">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                  <span class="font-mono text-xs font-semibold text-success">Docu-RAG</span>
+                </div>
+                <span id="status-docs-count" class="text-[10px] font-mono opacity-50 bg-base-300 px-1 rounded">...</span>
+              </div>
+              <p class="text-xs text-base-content/60 leading-snug">Runbooks, architecture, procedures</p>
+              <p class="text-[11px] font-mono text-base-content/35 mt-2 italic border border-base-300 inline-block px-1 rounded">/docs</p>
+            </button>
+            <!-- Config Validator card -->
+            <button type="button"
+                    onclick="document.getElementById('file-input').click();"
+                    class="card bg-base-200 hover:bg-warning/10 border border-base-300 hover:border-warning/40 transition-all cursor-pointer p-3 text-left rounded-xl">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span class="font-mono text-xs font-semibold text-warning">Config Validator</span>
+                </div>
+                <span id="status-schemas-count" class="text-[10px] font-mono opacity-50 bg-base-300 px-1 rounded">...</span>
+              </div>
+              <p class="text-xs text-base-content/60 leading-snug">Validate K8s &amp; GitLab CI YAML</p>
+              <p class="text-[11px] font-mono text-base-content/35 mt-2 italic border border-base-300 inline-block px-1 rounded">/validate</p>
+            </button>
+          </div>
+          <div class="text-center mt-6">
+            <span id="status-llm" class="text-xs font-mono text-base-content/40 transition-colors">Checking LLM status...</span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ── Typing indicator ───────────────────────────────────────────────── -->
+    <div id="typing-indicator" class="px-4 pb-1">
+      <div class="chat chat-start">
+        <div class="chat-bubble chat-bubble-neutral py-2 px-4 font-mono text-xs flex items-center gap-2">
+          <span class="text-primary">&#9654;</span>
+          <span>Processing</span>
+          <span class="typing-cursor">_</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Input form ─────────────────────────────────────────────────────── -->
+    <form id="chat-form"
+          hx-post="/chat/html"
+          hx-target="#chat-container"
+          hx-swap="beforeend"
+          hx-indicator="#typing-indicator"
+          hx-disabled-elt="find [type=submit]"
+          hx-encoding="multipart/form-data"
+          class="shrink-0 px-4 pt-2 pb-2 bg-base-200 border-t border-base-300">
+      
+      <input type="hidden" name="conversation_id" id="hidden-conversation-id" value="">
+
+      <!-- File attachment badge -->
+      <div id="file-badge" class="hidden mb-1.5 flex items-center gap-2">
+        <span class="badge badge-warning badge-sm font-mono gap-1">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span id="file-name" class="max-w-48 truncate"></span>
+          <span id="file-size" class="text-base-content/50"></span>
+        </span>
+        <button type="button" id="remove-file"
+                class="text-xs opacity-50 hover:opacity-100 font-mono">✕ remove</button>
+      </div>
+
+      <div class="flex gap-2 items-end">
+        <input type="file" id="file-input" name="file" accept=".yaml,.yml" class="hidden" />
+
+        <!-- Attach button -->
+        <button type="button" id="attach-btn"
+                class="btn btn-ghost btn-sm h-10 px-2 shrink-0 hover:text-warning transition-colors"
+                title="Attach YAML file (.yaml / .yml)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+
+        <textarea id="message-input"
+                  name="message"
+                  class="textarea textarea-bordered flex-1 resize-none font-mono text-sm min-h-10 max-h-44 leading-snug"
+                  placeholder="Ask about logs, docs, or attach a YAML file…"
+                  rows="1"
+                  required></textarea>
+
+        <button type="submit" id="send-btn"
+                class="btn btn-primary btn-sm h-10 px-4 font-mono shrink-0"
+                disabled>
+          Send
+        </button>
+      </div>
+    </form>
+
+    <p class="text-xs opacity-30 font-mono text-center pb-1.5 shrink-0 bg-base-200">
+      Enter ↵ send &nbsp;·&nbsp; Shift+Enter ⏎ newline &nbsp;·&nbsp; drag &amp; drop .yaml
+    </p>
+  </div>
+
+  <!-- ── Ingest modal ─────────────────────────────────────────────────────── -->
+  <!-- ── Chunk preview modal ──────────────────────────────────────────────── -->
+  <dialog id="chunk-modal" class="modal">
+    <div class="modal-box w-full max-w-2xl">
+      <div id="chunk-modal-body" class="min-h-16"></div>
+      <div class="modal-action mt-2">
+        <button type="button" class="btn btn-ghost btn-sm font-mono"
+                onclick="document.getElementById('chunk-modal').close()">Close</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-hidden="true"></button></form>
+  </dialog>
+
+  <dialog id="ingest-modal" class="modal">
+    <div class="modal-box w-full max-w-md p-0 overflow-hidden">
+
+      <!-- Modal header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-base-300">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          <h3 class="font-mono font-bold text-sm">Add Documents</h3>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs btn-circle"
+                onclick="document.getElementById('ingest-modal').close()">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal body -->
+      <form hx-post="/ingest" hx-target="#ingest-status" hx-swap="innerHTML"
+            hx-encoding="multipart/form-data" hx-indicator="#ingest-spinner">
+        <div class="px-6 py-4 space-y-4">
+
+          <!-- Drop zone -->
+          <div id="ingest-drop"
+               class="border-2 border-dashed border-base-300 hover:border-success rounded-xl py-7 px-4 text-center cursor-pointer transition-all group"
+               onclick="document.getElementById('ingest-file-input').click()">
+            <svg class="w-5 h-5 mx-auto mb-2 text-base-content/25 group-hover:text-success/50 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p class="text-sm font-mono text-base-content/60 group-hover:text-base-content/80 transition-colors">
+              Drop a file or <span class="text-success font-semibold underline underline-offset-2">browse</span>
+            </p>
+            <p id="ingest-file-name" class="text-xs font-mono text-success mt-2 hidden"></p>
+            <div class="flex flex-wrap justify-center gap-1 mt-3">
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">PDF</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">DOCX</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">PPTX</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">XLSX</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">.md</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">.txt</span>
+              <span class="badge badge-ghost badge-xs font-mono text-base-content/40">images</span>
+            </div>
+          </div>
+          <input type="file" id="ingest-file-input" name="file"
+                 accept=".pdf,.docx,.pptx,.xlsx,.md,.txt,.png,.jpg,.jpeg,.gif,.webp" class="hidden" />
+
+          <!-- OR divider -->
+          <div class="flex items-center gap-3">
+            <div class="flex-1 border-t border-base-300"></div>
+            <span class="text-xs font-mono text-base-content/30 px-1">OR</span>
+            <div class="flex-1 border-t border-base-300"></div>
+          </div>
+
+          <!-- URL field -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-mono text-base-content/50 font-medium">Paste a URL</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </span>
+              <input type="url" name="url" placeholder="https://..."
+                     class="input input-bordered input-sm w-full font-mono text-sm pl-8" />
+            </div>
+          </div>
+
+          <!-- Tags field -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-mono text-base-content/50 font-medium">
+              Tags
+              <span class="text-base-content/30 font-normal ml-1">(optional, comma-separated)</span>
+            </label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                  <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+              </span>
+              <input type="text" name="tags" placeholder="k8s, minio, runbook"
+                     class="input input-bordered input-sm w-full font-mono text-sm pl-8" />
+            </div>
+          </div>
+
+          <!-- Status / spinner -->
+          <div id="ingest-status" class="min-h-5 text-sm font-mono"></div>
+          <span id="ingest-spinner" class="htmx-indicator flex items-center gap-2 text-xs font-mono text-base-content/50">
+            <span class="loading loading-spinner loading-xs"></span>
+            Ingesting document...
+          </span>
+
+        </div>
+
+        <!-- Modal footer -->
+        <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-base-300 bg-base-200/50">
+          <button type="button" class="btn btn-ghost btn-sm font-mono"
+                  onclick="document.getElementById('ingest-modal').close()">Cancel</button>
+          <button type="submit" class="btn btn-success btn-sm font-mono gap-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Ingest
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-hidden="true"></button></form>
+  </dialog>
+
+  <!-- ── Schema management modal ─────────────────────────────────────────── -->
+  <dialog id="schema-modal" class="modal">
+    <div class="modal-box w-full max-w-lg p-0 overflow-hidden">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-base-300">
+        <h3 class="font-mono font-bold text-sm">Schema Management</h3>
+        <button type="button" class="btn btn-ghost btn-xs btn-circle"
+                onclick="document.getElementById('schema-modal').close()">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="px-5 pt-4" role="tablist">
+        <div class="tabs tabs-bordered">
+          <input type="radio" name="schema-tabs" id="schema-tab-upload" role="tab"
+                 class="tab font-mono text-xs" aria-label="Upload Schema" checked />
+          <div role="tabpanel" class="tab-content pt-4 pb-2">
+            <form hx-post="/schemas" hx-target="#schema-status" hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data" class="space-y-3">
+              <div id="schema-drop"
+                   class="border-2 border-dashed border-base-300 hover:border-warning rounded-xl p-5 text-center cursor-pointer transition-colors"
+                   onclick="document.getElementById('schema-file-input').click()">
+                <p class="text-sm font-mono text-base-content/50">Drop schema or <span class="text-warning underline">browse</span></p>
+                <p class="text-xs text-base-content/30 mt-1">JSON Schema · OpenAPI · YAML template</p>
+                <p id="schema-file-name" class="text-xs font-mono text-warning mt-2 hidden"></p>
+              </div>
+              <input type="file" id="schema-file-input" name="file"
+                     accept=".json,.yaml,.yml" class="hidden" />
+              <div>
+                <label class="label py-0.5"><span class="label-text text-xs font-mono">Title</span></label>
+                <input type="text" name="title" placeholder="e.g. K8s Deployment v1" class="input input-bordered input-sm w-full font-mono text-sm" />
+              </div>
+              <div>
+                <label class="label py-0.5"><span class="label-text text-xs font-mono">Description (optional)</span></label>
+                <input type="text" name="description" placeholder="Short note about this schema" class="input input-bordered input-sm w-full font-mono text-sm" />
+              </div>
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <span class="htmx-indicator text-xs font-mono text-base-content/50">Uploading…</span>
+                <button type="submit" class="btn btn-warning btn-sm font-mono">Store</button>
+              </div>
+            </form>
+          </div>
+
+          <input type="radio" name="schema-tabs" id="schema-tab-validate" role="tab"
+                 class="tab font-mono text-xs" aria-label="Validate Document" />
+          <div role="tabpanel" class="tab-content pt-4 pb-2">
+            <form hx-post="/validate/document" hx-target="#schema-status" hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data" class="space-y-3">
+              <div>
+                <label class="label py-0.5"><span class="label-text text-xs font-mono">Reference schema</span></label>
+                <div id="schema-selector-wrap"
+                     hx-get="/schemas" hx-trigger="schema-modal-open from:body" hx-swap="innerHTML">
+                  <span class="text-xs font-mono text-base-content/40">Loading schemas…</span>
+                </div>
+              </div>
+              <div id="doc-drop"
+                   class="border-2 border-dashed border-base-300 hover:border-warning rounded-xl p-5 text-center cursor-pointer transition-colors"
+                   onclick="document.getElementById('doc-file-input').click()">
+                <p class="text-sm font-mono text-base-content/50">Drop YAML document or <span class="text-warning underline">browse</span></p>
+                <p id="doc-file-name" class="text-xs font-mono text-warning mt-2 hidden"></p>
+              </div>
+              <input type="file" id="doc-file-input" name="file"
+                     accept=".yaml,.yml" class="hidden" />
+              <div>
+                <label class="label py-0.5"><span class="label-text text-xs font-mono">Or paste YAML</span></label>
+                <textarea name="yaml_text" rows="5"
+                          placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;…"
+                          class="textarea textarea-bordered w-full font-mono text-xs"></textarea>
+              </div>
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <span class="htmx-indicator text-xs font-mono text-base-content/50">Validating…</span>
+                <button type="submit" class="btn btn-warning btn-sm font-mono">Validate</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status area -->
+      <div id="schema-status" class="px-5 pb-4 min-h-8 mt-2"></div>
+
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+
+  <!-- ── Toast notification ───────────────────────────────────────────────── -->
+  <div id="toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
+    <div class="alert alert-info py-2 px-4 text-sm font-mono shadow-lg">
+      <span id="toast-msg"></span>
+    </div>
+  </div>
+
+  <!-- ── Drop overlay ─────────────────────────────────────────────────────── -->
+  <div id="drop-overlay" class="fixed inset-0 z-50 bg-base-300/60 backdrop-blur-sm flex items-center justify-center pointer-events-none hidden">
+    <div class="border-2 border-dashed border-warning rounded-xl p-8 text-warning font-mono text-sm">
+      Drop .yaml / .yml file here
+    </div>
+  </div>
+
+  <!-- ── JS ──────────────────────────────────────────────────────────────── -->
+  <script>
+  (function() {
+    // ── Theme init ────────────────────────────────────────────────────────
+    var saved = localStorage.getItem('theme');
+    if (!saved) {
+      localStorage.setItem('theme', 'business');
+      saved = 'business';
+    }
+    var cb = document.getElementById('theme-checkbox');
+    if (cb && saved === 'bumblebee') cb.checked = true;
+
+    // ── History API ───────────────────────────────────────────────────────
+    var currentConversationId = null;
+
+    function loadConversations() {
+      fetch('/conversations')
+        .then(function(r) { return r.json(); })
+        .then(function(conversations) {
+          var hl = document.getElementById('history-list');
+          hl.innerHTML = '';
+          if (!conversations || conversations.length === 0) {
+            hl.innerHTML = '<p class="text-xs font-mono text-base-content/40 italic p-2 text-center">No recent chats</p>';
+            return;
+          }
+          conversations.forEach(function(c) {
+            var btn = document.createElement('button');
+            btn.className = 'w-full text-left font-mono text-xs p-2 rounded-lg truncate hover:bg-base-300/50 transition-colors opacity-80 hover:opacity-100 flex items-center justify-between group';
+            if (c.id === currentConversationId) btn.classList.add('bg-base-300/50', 'text-primary', 'font-semibold');
+
+            var spanTitle = document.createElement('span');
+            spanTitle.className = 'truncate max-w-[85%]';
+            spanTitle.textContent = c.title;
+
+            var delBtn = document.createElement('span');
+            delBtn.className = 'opacity-0 group-hover:opacity-100 hover:text-error transition-all p-1 whitespace-nowrap ml-2';
+            delBtn.innerHTML = '✕';
+            delBtn.onclick = function(e) {
+              e.stopPropagation();
+              if (confirm('Delete chat?')) deleteConversation(c.id);
+            };
+
+            btn.appendChild(spanTitle);
+            btn.appendChild(delBtn);
+
+            btn.onclick = function() { loadMessages(c.id, c.title); };
+            hl.appendChild(btn);
+          });
+        });
+    }
+
+    function loadMessages(conversationId, title) {
+      currentConversationId = conversationId;
+      document.getElementById('hidden-conversation-id').value = conversationId;
+      updateTopbarTitle(title);
+      loadConversations(); // refresh active state
+
+      fetch('/conversations/' + conversationId + '/messages')
+        .then(function(r) { return r.json(); })
+        .then(function(messages) {
+          var container = document.getElementById('chat-container');
+          var ws = document.getElementById('welcome-screen');
+          if (ws) ws.style.display = 'none';
+          
+          // Clear current bubbles
+          var bubbles = container.querySelectorAll('.chat');
+          bubbles.forEach(function(b) { b.remove(); });
+
+          messages.forEach(function(msg) {
+            var div = document.createElement('div');
+            div.className = msg.role === 'user' ? 'chat chat-end' : 'chat chat-start';
+            
+            var innerHTML = '';
+            if (msg.role === 'assistant') {
+              if (msg.agent) {
+                innerHTML += '<div class="chat-header opacity-60 text-xs mb-0.5"><span class="badge badge-outline badge-xs font-mono">' + msg.agent + '</span></div>';
+              }
+              var bubbleClass = msg.is_error ? 'chat-bubble-error' : 'chat-bubble-neutral';
+              innerHTML += '<div class="chat-bubble ' + bubbleClass + ' break-words text-sm leading-relaxed">';
+              innerHTML += '<div class="md-content" data-raw="' + msg.content.replace(/"/g, '&quot;') + '"></div>';
+              if (msg.is_error) {
+                innerHTML += '<div class="mt-2 pt-2 border-t border-error/30"><span class="text-xs font-mono opacity-60">Error recorded</span></div>';
+              }
+              innerHTML += '</div>';
+
+              // Footer
+              var footerHtml = '<div class="chat-footer flex flex-wrap gap-1 mt-1 items-center">';
+              if (msg.chunk_sources && msg.chunk_sources.length > 0) {
+                msg.chunk_sources.forEach(function(cs) {
+                  footerHtml += '<button type="button" onclick="window.openChunkPreview(\'' + cs.doc_id + '\')" class="badge badge-success badge-sm font-mono cursor-pointer hover:badge-accent transition-colors" title="chunk ' + cs.chunk_index + ' — click to preview">' + (cs.title.length > 40 ? cs.title.substring(0, 39) + '…' : cs.title) + '</button>';
+                });
+              } else if (msg.sources && msg.sources.length > 0) {
+                msg.sources.forEach(function(src) {
+                  footerHtml += '<span class="badge badge-info badge-sm font-mono">' + src + '</span>';
+                });
+              }
+              
+              if (!msg.is_error) {
+                footerHtml += '<div class="flex items-center gap-0.5 ml-auto"><button type="button" class="btn btn-ghost btn-xs px-1 opacity-40 hover:opacity-100 hover:text-success transition-all" onclick="submitFeedback(\'' + msg.id + '\', \'up\', this)"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button><button type="button" class="btn btn-ghost btn-xs px-1 opacity-40 hover:opacity-100 hover:text-error transition-all" onclick="submitFeedback(\'' + msg.id + '\', \'down\', this)"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></button></div>';
+              }
+              
+              var d = new Date(msg.created_at);
+              footerHtml += '<time class="text-xs opacity-40 font-mono ' + (msg.is_error ? 'ml-auto' : '') + '">' + d.toLocaleTimeString() + '</time></div>';
+              innerHTML += footerHtml;
+            } else {
+              var display = msg.content ? msg.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+              innerHTML += '<div class="chat-bubble chat-bubble-primary text-sm whitespace-pre-wrap font-mono">' + display + '</div>';
+            }
+            
+            div.innerHTML = innerHTML;
+            container.appendChild(div);
+            
+            // Render markdown
+            var mdContent = div.querySelector('.md-content');
+            if (mdContent) {
+              var txt = document.createElement('textarea');
+              txt.innerHTML = mdContent.dataset.raw;
+              mdContent.innerHTML = window.marked ? window.marked.parse(txt.value) : txt.value;
+            }
+          });
+          container.scrollTop = container.scrollHeight;
+        });
+    }
+
+    window.openChunkPreview = function(doc_id) {
+      var modal = document.getElementById('chunk-modal');
+      var body  = document.getElementById('chunk-modal-body');
+      body.innerHTML = '<div class="flex justify-center py-6"><span class="loading loading-spinner loading-md"></span></div>';
+      modal.showModal();
+      fetch('/docs/chunk/' + doc_id).then(function(r) { return r.text(); }).then(function(html) { body.innerHTML = html; }).catch(function() { body.innerHTML = '<p class="text-error font-mono text-sm p-4">Failed to load chunk.</p>'; });
+    };
+
+    function deleteConversation(id) {
+      fetch('/conversations/' + id, { method: 'DELETE' })
+        .then(function() { 
+          if (id === currentConversationId) newChat();
+          else loadConversations();
+        });
+    }
+
+    function newChat() {
+      var container = document.getElementById('chat-container');
+      var bubbles = container.querySelectorAll('.chat');
+      bubbles.forEach(function(b) { b.remove(); });
+      
+      currentConversationId = null;
+      document.getElementById('hidden-conversation-id').value = '';
+      updateTopbarTitle('New Chat');
+      loadConversations();
+      
+      var ws = document.getElementById('welcome-screen');
+      if (ws) ws.style.display = '';
+    }
+
+    document.getElementById('new-chat-btn').addEventListener('click', newChat);
+
+    // ── Feedback ────────────────────────────────────────────────────────
+    window.submitFeedback = function(messageId, rating, btn) {
+      var fd = new FormData();
+      fd.append('message_id', messageId);
+      fd.append('rating', rating);
+      fetch('/feedback', { method: 'POST', body: fd }).then(function(r){
+        if (r.ok) {
+          btn.parentElement.innerHTML = '<span class="text-xs font-mono text-success text-opacity-70 px-1">Thanks!</span>';
+        }
+      });
+    };
+
+    // ── Load Status dynamically ─────────────────────────────────────────
+    function loadStatus() {
+      fetch('/status').then(function(r){ return r.json(); }).then(function(data) {
+        var llmStatus = document.getElementById('status-llm');
+        if (llmStatus) {
+           llmStatus.textContent = data.llm_ok ? ('🟢 ' + (data.llm_backend || 'LLM') + ' active') : '🔴 LLM offline';
+           llmStatus.className = 'text-xs font-mono ' + (data.llm_ok ? 'text-success' : 'text-error');
+        }
+        var statusLogs = document.getElementById('status-logs-count');
+        if (statusLogs) statusLogs.textContent = (data.logs_count || 0) + ' rows';
+        
+        var statusDocs = document.getElementById('status-docs-count');
+        if (statusDocs) statusDocs.textContent = (data.docs_count || 0) + ' docs';
+        
+        var statusSchemas = document.getElementById('status-schemas-count');
+        if (statusSchemas) statusSchemas.textContent = (data.schemas_count || 0) + ' schemas';
+      }).catch(function(){});
+    }
+
+    // ── Sidebar toggle ────────────────────────────────────────────────────
+    var SIDEBAR_KEY = 'sre_copilot_sidebar';
+    var sidebar = document.getElementById('sidebar');
+    var sidebarOpen = localStorage.getItem(SIDEBAR_KEY) !== 'closed';
+    if (!sidebarOpen) sidebar.classList.add('collapsed');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function() {
+      sidebarOpen = !sidebarOpen;
+      sidebar.classList.toggle('collapsed', !sidebarOpen);
+      localStorage.setItem(SIDEBAR_KEY, sidebarOpen ? 'open' : 'closed');
+    });
+
+    // ── Topbar title ──────────────────────────────────────────────────────
+    function updateTopbarTitle(title) {
+      var el = document.getElementById('topbar-title');
+      if (el) el.textContent = title;
+    }
+
+    // ── Toast ─────────────────────────────────────────────────────────────
+    var toastTimer = null;
+    function showToast(msg) {
+      var el = document.getElementById('toast');
+      var msgEl = document.getElementById('toast-msg');
+      msgEl.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function() { el.classList.add('hidden'); }, 3000);
+    }
+
+    window.setPrompt = function(text) {
+      var ta = document.getElementById('message-input');
+      ta.value = text;
+      ta.dispatchEvent(new Event('input'));
+      ta.focus();
+    };
+
+    // ── DOM refs ──────────────────────────────────────────────────────────
+    var ta          = document.getElementById('message-input');
+    var container   = document.getElementById('chat-container');
+    var sendBtn     = document.getElementById('send-btn');
+    var fileInput   = document.getElementById('file-input');
+    var attachBtn   = document.getElementById('attach-btn');
+    var fileBadge   = document.getElementById('file-badge');
+    var fileNameEl  = document.getElementById('file-name');
+    var fileSizeEl  = document.getElementById('file-size');
+    var removeFileBtn = document.getElementById('remove-file');
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      return (bytes / 1024).toFixed(1) + ' KB';
+    }
+
+    function showFile(file) {
+      fileNameEl.textContent = file.name;
+      fileSizeEl.textContent = '(' + formatSize(file.size) + ')';
+      fileBadge.classList.remove('hidden');
+      ta.removeAttribute('required');
+      sendBtn.disabled = false;
+    }
+
+    function clearFile() {
+      fileInput.value = '';
+      fileBadge.classList.add('hidden');
+      fileNameEl.textContent = '';
+      fileSizeEl.textContent = '';
+      ta.setAttribute('required', '');
+      sendBtn.disabled = ta.value.trim() === '';
+    }
+
+    attachBtn.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files.length > 0) showFile(fileInput.files[0]);
+    });
+    removeFileBtn.addEventListener('click', clearFile);
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    window.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        newChat();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          ta.focus();
+          ta.value = '/';
+        }
+      }
+    });
+
+    ta.addEventListener('input', function() {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 176) + 'px';
+      sendBtn.disabled = ta.value.trim() === '' && fileInput.files.length === 0;
+    });
+
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+
+    // ── Drag and drop ─────────────────────────────────────────────────────
+    var dropOverlay = document.getElementById('drop-overlay');
+    var dragCount = 0;
+    document.body.addEventListener('dragenter', function(e) { e.preventDefault(); dragCount++; dropOverlay.classList.remove('hidden'); });
+    document.body.addEventListener('dragleave', function(e) { e.preventDefault(); dragCount--; if (dragCount <= 0) { dragCount = 0; dropOverlay.classList.add('hidden'); } });
+    document.body.addEventListener('dragover', function(e) { e.preventDefault(); });
+    document.body.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dragCount = 0;
+      dropOverlay.classList.add('hidden');
+      var file = e.dataTransfer.files[0];
+      if (file && /\.(yaml|yml)$/i.test(file.name)) {
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        showFile(file);
+      }
+    });
+
+    window.__lastUserMessage = '';
+
+    // ── HTMX Form Logic ───────────────────────────────────────────────────
+    document.body.addEventListener('htmx:beforeRequest', function(e) {
+      if (e.detail.elt.id !== 'chat-form') return;
+      var msg = ta.value.trim();
+      if (msg) window.__lastUserMessage = msg;
+      var hasFile = fileInput.files.length > 0;
+      if (!msg && !hasFile) { e.preventDefault(); return; }
+
+      var ws = document.getElementById('welcome-screen');
+      if (ws) ws.style.display = 'none';
+
+      var display = msg
+        ? msg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        : '';
+      if (hasFile) {
+        display += (display ? '\n' : '') + '📎 ' + fileInput.files[0].name;
+      }
+
+      var div = document.createElement('div');
+      div.className = 'chat chat-end';
+      div.innerHTML = '<div class="chat-bubble chat-bubble-primary text-sm whitespace-pre-wrap font-mono">' + display + '</div>';
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    });
+    
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+      if (e.detail.elt.id !== 'chat-form') return;
+      var newCovId = e.detail.xhr.getResponseHeader('X-Conversation-Id');
+      if (newCovId && !currentConversationId) {
+         currentConversationId = newCovId;
+         document.getElementById('hidden-conversation-id').value = newCovId;
+         var msg = window.__lastUserMessage || "New Chat";
+         updateTopbarTitle(msg.substring(0, 42));
+         loadConversations();
+      }
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+      if (e.detail.target.id !== 'chat-container') return;
+      container.scrollTop = container.scrollHeight;
+      clearFile();
+      ta.value = '';
+      ta.style.height = 'auto';
+      sendBtn.disabled = true;
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    loadConversations();
+    loadStatus();
+
+    // ── Document Modal Drag-and-Drop ──────────────────────────────────────
+    (function() {
+      var inp  = document.getElementById('ingest-file-input');
+      var drop = document.getElementById('ingest-drop');
+      var name = document.getElementById('ingest-file-name');
+      if (!inp || !drop) return;
+      inp.addEventListener('change', function() {
+        if (inp.files.length) { name.textContent = inp.files[0].name; name.classList.remove('hidden'); }
+      });
+      drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('border-success'); });
+      drop.addEventListener('dragleave', function() { drop.classList.remove('border-success'); });
+      drop.addEventListener('drop', function(e) {
+        e.preventDefault(); drop.classList.remove('border-success');
+        var f = e.dataTransfer.files[0]; if (!f) return;
+        var dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files;
+        name.textContent = f.name; name.classList.remove('hidden');
+      });
+    })();
+
+    (function() {
+      function setupDrop(inputId, dropId, nameId, borderClass) {
+        var inp  = document.getElementById(inputId);
+        var drop = document.getElementById(dropId);
+        var name = document.getElementById(nameId);
+        if (!inp || !drop) return;
+        inp.addEventListener('change', function() {
+          if (inp.files.length) { name.textContent = inp.files[0].name; name.classList.remove('hidden'); }
+        });
+        drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add(borderClass); });
+        drop.addEventListener('dragleave', function() { drop.classList.remove(borderClass); });
+        drop.addEventListener('drop', function(e) {
+          e.preventDefault(); drop.classList.remove(borderClass);
+          var f = e.dataTransfer.files[0]; if (!f) return;
+          var dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files;
+          name.textContent = f.name; name.classList.remove('hidden');
+        });
+      }
+      setupDrop('schema-file-input', 'schema-drop', 'schema-file-name', 'border-warning');
+      setupDrop('doc-file-input', 'doc-drop', 'doc-file-name', 'border-warning');
+    })();
+
+  })();
+  </script>
+</body>
+</html>

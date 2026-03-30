@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+metadata:
+  name: my-api-service  # FIXED: was 'My-api-service' → 'my-api-service' — metadata.name must be lowercase
+  namespace: production # FIXED: was 'Production' → 'production' — namespace must be lowercase
+  labels:
+    app: my-api
+    version: "1.2.3"
+    env: production
+spec:
+  replicas: 3  # FIXED: was '"three"' → '3' — replicas must be integer
+  selector:
+    matchLabels:
+      app: my-api
+      version: "1.2.3"  # FIXED: was 'Missing' → '"1.2.3"' — selector must match template labels
+  strategy:
+    type: RollingUpdate  # FIXED: was 'BlueGreen' → 'RollingUpdate' — invalid strategy type
+  template:
+    metadata:
+      labels:
+        app: my-api
+        version: "1.2.3"
+    spec:
+      containers:
+      - name: my-api-container
+        image: nginx:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: postgres://user:pass@db:5432/mydb
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "128Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+      - name: sidecar-proxy
+        image: sidecar-proxy:latest

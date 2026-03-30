@@ -1,0 +1,145 @@
+name: "Visual Design Screenshot Collection"
+session: "sre-copilot-visual-05"
+browser: chrome
+headed: false
+timeout: 90
+auto_close: true
+
+# Systematic screenshot collection for visual/design review.
+# No pass/fail assertions — documents visual state at multiple viewport sizes
+# and interaction states.
+#
+# Design analysis context (see plan):
+#   Theme:    DaisyUI "dim" dark
+#   Fonts:    JetBrains Mono (chrome/mono) + Inter (prose)
+#   Layout:   h-dvh flex-col, flex-1 chat area, pinned input bar
+#   Colors:   text-info (log), text-success (doc), text-warning (cfg)
+#
+# Known issues captured by these screenshots:
+#   - No favicon (404 console error)
+#   - No keyboard shortcut hint near textarea
+#   - Send button not disabled during request
+#   - space-y-1 tight bubble spacing
+
+steps:
+  - name: "Open homepage at default viewport"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  # ── Viewport sizes ──────────────────────────────────────────────────────────
+
+  - name: "Resize to 1440x900 (wide desktop)"
+    action: run_code
+    args: ["async page => await page.setViewportSize({ width: 1440, height: 900 })"]
+    wait: 0.3
+
+  - name: "Screenshot: 1440x900 desktop"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-desktop-1440.png"]
+
+  - name: "Resize to 1280x800 (standard laptop)"
+    action: run_code
+    args: ["async page => await page.setViewportSize({ width: 1280, height: 800 })"]
+    wait: 0.3
+
+  - name: "Screenshot: 1280x800 laptop"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-laptop-1280.png"]
+
+  - name: "Resize to 768x1024 (tablet portrait)"
+    action: run_code
+    args: ["async page => await page.setViewportSize({ width: 768, height: 1024 })"]
+    wait: 0.3
+
+  - name: "Screenshot: 768x1024 tablet"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-tablet-768.png"]
+
+  - name: "Resize to 375x812 (mobile — iPhone X)"
+    action: run_code
+    args: ["async page => await page.setViewportSize({ width: 375, height: 812 })"]
+    wait: 0.3
+
+  - name: "Screenshot: 375x812 mobile"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-mobile-375.png"]
+
+  - name: "Restore 1280x800 for interaction states"
+    action: run_code
+    args: ["async page => await page.setViewportSize({ width: 1280, height: 800 })"]
+    wait: 0.3
+
+  # ── Interaction states ──────────────────────────────────────────────────────
+
+  - name: "Hover over Send button"
+    action: hover
+    args: ["#chat-form button[type=submit]"]
+
+  - name: "Screenshot: Send button hover state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-send-hover.png"]
+
+  - name: "Click textarea to focus"
+    action: click
+    args: ["#message-input"]
+
+  - name: "Screenshot: textarea focused (shows border highlight)"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-textarea-focus.png"]
+
+  - name: "Type a sample message"
+    action: type
+    args: ["show me errors for api-gateway in the last 30 minutes"]
+
+  - name: "Screenshot: textarea filled with content"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-textarea-filled.png"]
+
+  - name: "Hover over 4-Agent badge in header"
+    action: hover
+    args: [".badge-primary.badge-outline"]
+
+  - name: "Screenshot: header badge hover state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-badge-hover.png"]
+
+  - name: "Submit message — capture loading dots animation"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+    wait: 0.2
+
+  - name: "Screenshot: typing indicator / loading dots visible"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-loading-dots.png"]
+
+  - name: "Wait for full agent response"
+    action: eval
+    args: ["null"]
+    wait: 30
+
+  - name: "Screenshot: full conversation with response bubble"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-full-conversation.png"]
+
+  # ── Close-up details ────────────────────────────────────────────────────────
+
+  - name: "Scroll to top to capture header detail"
+    action: eval
+    args: ["document.getElementById('chat-container').scrollTop = 0; true"]
+
+  - name: "Screenshot: header detail"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-header-detail.png"]
+
+  - name: "Scroll to bottom to capture input bar detail"
+    action: eval
+    args: ["document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight; true"]
+
+  - name: "Screenshot: input form detail"
+    action: screenshot
+    args: ["tests/e2e/screenshots/05-input-bar-detail.png"]
+
+  - name: "Snapshot: final visual state DOM"
+    action: snapshot
+    args: ["tests/e2e/snapshots/05-visual-final.yaml"]

@@ -1,0 +1,96 @@
+name: "Chat Interaction Flow"
+session: "sre-copilot-chat-02"
+browser: chrome
+headed: false
+timeout: 90
+auto_close: true
+
+# Tests the full HTMX round-trip:
+#   user types → user bubble appears client-side → typing indicator shows
+#   → assistant response renders → textarea cleared → page scrolled.
+#
+# Requires: server running with a working ANTHROPIC_API_KEY (or Ollama).
+
+steps:
+  - name: "Open homepage"
+    action: open
+    args: ["http://localhost:8000/"]
+    wait: 2
+
+  - name: "Screenshot: pre-chat initial state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-pre-send.png"]
+
+  - name: "Record initial chat bubble count (should be 1 — welcome message)"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-bubble').length"]
+
+  - name: "Fill message input"
+    action: fill
+    args: ["#message-input", "show errors for api-gateway"]
+
+  - name: "Verify input value set correctly"
+    action: eval
+    args: ["document.getElementById('message-input').value === 'show errors for api-gateway'"]
+
+  - name: "Screenshot: message typed in textarea"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-typed.png"]
+
+  - name: "Click Send button to submit"
+    action: click
+    args: ["#chat-form button[type=submit]"]
+
+  - name: "Screenshot: immediately after click — user bubble should appear client-side"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-user-bubble.png"]
+    wait: 0.3
+
+  - name: "Verify user bubble appeared (chat-end alignment)"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-end').length >= 1"]
+
+  - name: "Verify user bubble contains submitted message text"
+    action: eval
+    args: ["Array.from(document.querySelectorAll('#chat-container .chat-end .chat-bubble')).some(b => b.textContent.includes('show errors for api-gateway'))"]
+
+  - name: "Verify textarea cleared after submit"
+    action: eval
+    args: ["document.getElementById('message-input').value === ''"]
+
+  - name: "Screenshot: loading/typing indicator state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-loading.png"]
+
+  - name: "Wait for assistant response (up to 30s)"
+    action: eval
+    args: ["null"]
+    wait: 30
+
+  - name: "Screenshot: response received"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-response.png"]
+
+  - name: "Verify assistant response bubble appeared (chat-start count >= 2)"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-start').length >= 2"]
+
+  - name: "Verify response bubble uses chat-bubble-neutral class"
+    action: eval
+    args: ["document.querySelectorAll('#chat-container .chat-start .chat-bubble-neutral').length >= 2"]
+
+  - name: "Verify typing indicator hidden after response"
+    action: eval
+    args: ["getComputedStyle(document.getElementById('typing-indicator')).display === 'none'"]
+
+  - name: "Verify chat container scrolled to bottom"
+    action: eval
+    args: ["(function(){ const c = document.getElementById('chat-container'); return Math.abs(c.scrollTop + c.clientHeight - c.scrollHeight) < 10; })()"]
+
+  - name: "Snapshot: post-chat DOM state"
+    action: snapshot
+    args: ["tests/e2e/snapshots/02-chat-response.yaml"]
+
+  - name: "Screenshot: final chat state"
+    action: screenshot
+    args: ["tests/e2e/screenshots/02-final.png"]

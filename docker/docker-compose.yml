@@ -1,0 +1,62 @@
+services:
+    minio:
+        image: quay.io/minio/minio:latest
+        container_name: devops-minio
+        env_file:
+            - .env
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+            MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+        ports:
+            - "${MINIO_PORT}:9000"
+            - "${MINIO_CONSOLE_PORT}:9001"
+        volumes:
+            - minio_data:/data
+        healthcheck:
+            test: ["CMD", "mc", "ready", "local"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    app:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+            target: runtime
+        container_name: devops-app
+        env_file:
+            - .env
+        depends_on:
+            minio:
+                condition: service_healthy
+        ports:
+            - "${PORT}:8000"
+        volumes:
+            - app_data:/app/data
+        environment:
+            APP_ENV: ${APP_ENV}
+            PORT: ${PORT}
+            MINIO_ENDPOINT: http://minio:9000
+            MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+            MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+            ICEBERG_WAREHOUSE: ${ICEBERG_WAREHOUSE}
+            ICEBERG_CATALOG_URI: ${ICEBERG_CATALOG_URI}
+            DUCKDB_DATA_PATH: ${DUCKDB_DATA_PATH}
+            DEMO_LOGS_PATH: ${DEMO_LOGS_PATH}
+            AGENT_BACKEND: ${AGENT_BACKEND}
+            AGENT_MODEL: ${AGENT_MODEL}
+            OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+            ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+            OPENAI_API_KEY: ${OPENAI_API_KEY}
+            MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+            EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+            EMBEDDING_DIM: ${EMBEDDING_DIM}
+            LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        restart: unless-stopped
+
+volumes:
+    minio_data:
+    app_data:
